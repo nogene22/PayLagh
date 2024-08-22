@@ -1,0 +1,8 @@
+Flask
+requests
+ptvsd
+pandas
+python-dotenv
+slackclient
+slackeventsapi
+gunicorn
