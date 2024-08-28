@@ -96,35 +96,46 @@ def get_spreadsheet_details() -> pd.DataFrame:
 
 def process_details(name: str, data: pd.DataFrame) -> Person:
     """
-    Turn CSv data into a Person object
-    :param name: name of current person
+    Turn CSV data into a Person object.
+    :param name: name of the current person
     :param data: CSV file with format specified in get_spreadsheet_details function
     :return: Person object with parsed information
     """
-    # assert len(data.keys()) >= 5
-    print(data.keys())
-    print(type(data.keys()))
-
     # expected default columns
     name_col = data.keys()[0]
     balance_col = data.keys()[1]
     total_col = data.keys()[2]
     paid_col = data.keys()[3]
 
-
     # get the values from CSV columns
     person_data = data.loc[data[name_col] == name]
+
+    if person_data.empty:
+        # Handle the case where the person's data is not found
+        print(f"Person '{name}' not found in the data.")
+        return Person(name, 0.0, 0.0, 0.0)
+
     print(person_data, "TEST")
-    #print
-    print(person_data[ balance_col])
-    print(person_data[ balance_col].iloc[0])
-    current_balance = person_data[balance_col].iloc[0]
-    debit = person_data[total_col].iloc[0]
-    paid = person_data[paid_col].iloc[0]
+
+    # Ensure there are enough rows before accessing them
+    if len(person_data) > 0:
+        current_balance = person_data[balance_col].iloc[0]
+        debit = person_data[total_col].iloc[0]
+        paid = person_data[paid_col].iloc[0]
+    else:
+        # Handle cases where no data is available
+        print(f"No balance data found for {name}.")
+        return Person(name, 0.0, 0.0, 0.0)
 
     # build the person object
-    person = Person(name, float(current_balance.replace("€", "").replace(",", "")), float(debit.replace("€", "").replace(",", "")), float(paid.replace("€", "").replace(",", "")))
+    person = Person(
+        name,
+        float(current_balance.replace("€", "").replace(",", "")),
+        float(debit.replace("€", "").replace(",", "")),
+        float(paid.replace("€", "").replace(",", ""))
+    )
     return person
+
 
 
 def get_people_data() -> List[Person]:
