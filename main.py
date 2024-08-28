@@ -286,6 +286,7 @@ def pay_where():
 
     # payment information
     text = f"""
+    Its actually working!Crazy
     Pay {TEAM} here:
     IBAN: {BANK_IBAN}
     BIC: {BANK_BIC}
