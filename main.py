@@ -30,8 +30,9 @@ BOT_ID = client.api_call("auth.test")["user_id"]
 # team name
 TEAM = "Ranelagh"
 
-# treasurer, usually gets different output for the basic command "/owe"
-TREASURERS = ["Louis Stewart", "Daniel Collins"]
+# TREASURERS, usually gets different output for the basic command "/owe"
+TREASURERS = ["Noah Coyne-Tyrrell", "Louis Stewart", "Daniel Collins"]
+TREASURER = "Louis Stewart"
 
 # payment details
 BANK_IBAN = "DE02100110012006085005"
@@ -40,7 +41,7 @@ BANK_BIC = "NTSBDEB1XXX"
 
 # required for pinging players wrt sending money, all of these are global objects! TODO: please refactor this
 PING_EXCLUDED_LIST = []
-#PING_TIMES_PER_PLAYER = {TREASURERS: "next Monday at 14:00"}
+PING_TIMES_PER_PLAYER = {TREASURER: "next Monday at 14:00"}
 PING_LIST = []
 REMINDERS = {}
 DEFAULT_TIME = "next Monday at 15:00"
@@ -232,7 +233,7 @@ def owe():
     prepaid = get_all_prepaid(people)
 
     if user_real_name in TREASURERS:
-        # If the command was issues by the Treasurer, reply with all debtors and prepaid accounts
+        # If the command was issues by the TREASURERS, reply with all debtors and prepaid accounts
         flagged = False
         for user in debtors:
             response += f"*{user.name}* needs to pay *{abs(user.current_balance)}* Euros\n"
@@ -259,7 +260,7 @@ def owe():
         if hits == 0:
             response = f"The user *{user_real_name}* owes {TEAM} *no* money."
         else:
-            response = f"The search you performed went wrong, please contact {TREASURER} for troubleshooting"
+            response = f"The search you performed went wrong, please contact {TREASURERS} for troubleshooting"
 
     channel_name = data.get("channel_name")
 
@@ -353,7 +354,7 @@ def player_finance_breakdown():
     if not user:
         # we can't find a slack account for this user name found in the spreadsheet!
         text += f"User {user_real_name} could not be found in {TEAM}'s financial book, " \
-                f"please contact *{TREASURER}* for further details."
+                f"please contact *{TREASURERS}* for further details."
     else:
         user = user[0]
         # build the financial record message
@@ -364,7 +365,7 @@ def player_finance_breakdown():
             text += f"- Membership for this year paid with the following amount: *{user.membership}* Euros\n"
         else:
             text += f"- Membership for the current year *not* paid, \n" \
-                    f"      _contact {TREASURER} if you want to become a member!_\n"
+                    f"      _contact {TREASURERS} if you want to become a member!_\n"
 
         # current balance positive, negative or 0
         if user.current_balance < 0:
@@ -411,7 +412,7 @@ def build_reminders():
     reminders = []
     for debtor, person in PING_LIST:
         text = f"You owe {TEAM} {debtor.current_balance} Euros. \n" \
-               f"Please use /paywhere to pay or contact {TREASURER}"
+               f"Please use /paywhere to pay or contact {TREASURERS}"
         if not PING_TIMES_PER_PLAYER.get(debtor.name):
             # add a default time when they get reminded if a more specific one wasn't set
             PING_TIMES_PER_PLAYER[debtor.name] = DEFAULT_TIME
@@ -426,7 +427,7 @@ def build_reminders():
 @app.route("/ping", methods=["POST"])
 def ping_players():
     """
-    Command to set reminders for people from TREASURER with how much they need to pay
+    Command to set reminders for people from TREASURERS with how much they need to pay
     Take one parameter: on/off
 
     :return: Response 200 required by Slack API
@@ -449,8 +450,8 @@ def ping_players():
 
     text = f""
 
-    # this command is publicly available but don't do anything if the person using it is not the treasurer!
-    if user_real_name == TREASURER:
+    #this command is publicly available but don't do anything if the person using it is not the TREASURERS!
+    if user_real_name in TREASURERS:
         if toggle == "on":
             # we're setting up the reminders
             people = get_people_data()
@@ -506,14 +507,15 @@ def ping_players():
             PING_LIST.clear()
             REMINDERS.clear()
     else:
-        text = f"This command can only be run by the {TEAM} Treasurer, " \
-               f"please contact *{TREASURER}* if you think you should be able to run it."
+        text = f"This command can only be run by the {TEAM} TREASURERS, " \
+               f"please contact *{TREASURERS}* if you think you should be able to run it."
 
     for reminder in REMINDERS:
         # for container logs!
         print(reminder)
     # send message with the result of the ping operation
     send_message_to_slack(user_id, channel_name, channel_id, text)
+    
 
     return Response(), 200
 
@@ -536,8 +538,8 @@ def ping_add_players():
     user_real_name = user.get("user").get("real_name")
     channel_name = data.get("channel_name")
 
-    # make sure only TREASURER can run this command
-    if user_real_name == TREASURER:
+    # make sure only TREASURERS can run this command
+    if user_real_name in TREASURERS:
         slack_people = client.users_list().get("members")
         for person in slack_people:
             if person.get("real_name") == person_to_add:
@@ -546,9 +548,9 @@ def ping_add_players():
                 PING_EXCLUDED_LIST.extend(skipped)
         text = f"Adding {person_to_add} to the remind list.\n"
     else:
-        text = f"This command can only be run by the {TEAM} Treasurer, " \
-               f"please contact *{TREASURER}* if you think you should be able to run it."
-    # send message with the result of the operation to treasurer
+        text = f"This command can only be run by the {TEAM} TREASURERS, " \
+               f"please contact *{TREASURERS}* if you think you should be able to run it."
+    # send message with the result of the operation to TREASURERS
     send_message_to_slack(user_id, channel_name, channel_id, text)
     return Response(), 200
 
@@ -570,16 +572,16 @@ def ping_remove_players():
     user_real_name = user.get("user").get("real_name")
     channel_name = data.get("channel_name")
 
-    # make sure only TREASURER can run this command
-    if user_real_name == TREASURER:
+    # make sure only TREASURERS can run this command
+    if user_real_name == TREASURERS:
         slack_people = client.users_list().get("members")
         for person in slack_people:
             if person.get("real_name") == person_to_skip:
                 PING_EXCLUDED_LIST.append(person_to_skip)
         text = f"Skipping {person_to_skip} from future reminders \n"
     else:
-        text = f"This command can only be run by the {TEAM} Treasurer, " \
-               f"please contact *{TREASURER}* if you think you should be able to run it."
+        text = f"This command can only be run by the {TEAM} TREASURERS, " \
+               f"please contact *{TREASURERS}* if you think you should be able to run it."
     send_message_to_slack(user_id, channel_name, channel_id, text)
 
     return Response(), 200
@@ -599,16 +601,16 @@ def ping_adjust_time():
     user_real_name = user.get("user").get("real_name")
     channel_name = data.get("channel_name")
 
-    # make sure only TREASURER can run this command
-    if user_real_name == TREASURER:
+    # make sure only TREASURERS can run this command
+    if user_real_name == TREASURERS:
         name, time = info.split(",")
         slack_people = [person.get("real_name") for person in client.users_list().get("members")]
         if name in slack_people:
             PING_TIMES_PER_PLAYER[name] = time
         text = f"adjusted reminders to *{PING_TIMES_PER_PLAYER[name]}* for _{name}_."
     else:
-        text = f"This command can only be run by the {TEAM} Treasurer, " \
-               f"please contact *{TREASURER}* if you think you should be able to run it."
+        text = f"This command can only be run by the {TEAM} TREASURERS, " \
+               f"please contact *{TREASURERS}* if you think you should be able to run it."
     send_message_to_slack(user_id, channel_name, channel_id, text)
 
     return Response(), 200
