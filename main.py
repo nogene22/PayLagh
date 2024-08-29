@@ -287,7 +287,6 @@ def pay_where():
 
     # payment information
     text = f"""
-    Its actually working!Crazy
     Pay {TEAM} here:
     IBAN: {BANK_IBAN}
     BIC: {BANK_BIC}
@@ -323,6 +322,11 @@ def commands():
 
     /paywhere:
     What are the bank details?
+    ______________________________________________________________
+    Treasurer Commands:
+
+    /ping:
+    Send alerts to all players in debt to ranelagh
     """
     channel_name = data.get("channel_name")
 
@@ -411,8 +415,8 @@ def build_reminders():
     """
     reminders = []
     for debtor, person in PING_LIST:
-        text = f"You owe {TEAM} {debtor.current_balance} Euros. \n" \
-               f"Please use /paywhere to pay or contact {TREASURERS}"
+        text = f"You are {debtor.current_balance} Euros in debt to {TEAM}. \n" \
+               f"Please use /paywhere to pay or contact {'/ '.join(TREASURERS[1:])}" #removes noah from treasurers list
         if not PING_TIMES_PER_PLAYER.get(debtor.name):
             # add a default time when they get reminded if a more specific one wasn't set
             PING_TIMES_PER_PLAYER[debtor.name] = DEFAULT_TIME
@@ -426,39 +430,34 @@ def build_reminders():
 
 @app.route("/ping", methods=["POST"])
 def ping_players():
-    """
-    Command to set reminders for people from TREASURERS with how much they need to pay
-    Take one parameter: on/off
-
-    :return: Response 200 required by Slack API
-    """
-
-    # get data from request
     data = request.form
-
-    # get user info
+    #print(f"Incoming form data: {data}")
+    
     user_id = data.get("user_id")
     channel_id = data.get("channel_id")
-    toggle = data.get("text")
+    #toggle set to constatntly on for the moment
+    toggle = "on" #data.get("text", "").strip()  # Default to an empty string and strip any extra whitespace
     user = client.users_info(user=user_id)
     user_real_name = user.get("user").get("real_name")
     channel_name = data.get("channel_name")
 
+    print(f"Ping command from: {user_real_name}")
+    #print(f"Toggle value: {toggle}")
+
     players_being_reminded = []
     players_already_reminded = []
     players_unreachable = []
+    text = ""
 
-    text = f""
-
-    #this command is publicly available but don't do anything if the person using it is not the TREASURERS!
     if user_real_name in TREASURERS:
         if toggle == "on":
-            # we're setting up the reminders
             people = get_people_data()
             debtors = get_all_debtors(people)
             slack_people = client.users_list().get("members")
 
-            # correlate debtors to slack names and add to global list PING_LIST
+            #print(f"Debtors: {debtors}")
+            #print(f"Slack users: {slack_people}")
+
             for person in debtors:
                 found = False
                 for slack_person in slack_people:
@@ -469,14 +468,14 @@ def ping_players():
                 if not found:
                     players_unreachable.append(person)
 
-            # build the reminder objects
+            
             reminders = build_reminders()
+           # print(f"Reminders built: {reminders}\n")
 
             user_client = slack.WebClient(token=os.environ["USER_SLACK_TOKEN"])
             for reminder in reminders:
-                # check if we don't need to ping this person
+                print(f"Processing reminder for {reminder.name}")
                 if reminder.name not in PING_EXCLUDED_LIST:
-                    # check if we already have a global reminder for this person
                     if REMINDERS.get(reminder.name, None) is None:
                         print(f"Adding reminder for {reminder.name}.")
                         reminder_id = user_client.reminders_add(
@@ -484,12 +483,10 @@ def ping_players():
                         )
                         REMINDERS[reminder.name] = reminder_id
                         players_being_reminded.append(reminder)
-
                     else:
                         players_already_reminded.append(reminder.name)
                         print(f"Already reminded {reminder.name}!!")
 
-            # build message with what the result of the operation was
             for person in players_being_reminded:
                 debt = person.text.split("\n")[0]
                 text += f"Reminded {person.name}: {debt}\n"
@@ -501,22 +498,20 @@ def ping_players():
                 text += f"Couldn't find this person {person.name} but they owe {person.current_balance}\n"
             text += f"\n"
         elif toggle == "off":
-            # clear all global objects, no more pinging
             PING_EXCLUDED_LIST.clear()
             PING_TIMES_PER_PLAYER.clear()
             PING_LIST.clear()
             REMINDERS.clear()
+            text = "All reminders have been cleared."
     else:
-        text = f"This command can only be run by the {TEAM} TREASURERS, " \
-               f"please contact *{TREASURERS}* if you think you should be able to run it."
-
-    for reminder in REMINDERS:
-        # for container logs!
-        print(reminder)
-    # send message with the result of the ping operation
-    send_message_to_slack(user_id, channel_name, channel_id, text)
+        text = f"This command can only be run by the {TEAM} TREASURERS, please contact *{TREASURERS}* if you think you should be able to run it."
     
+    if not text:
+        text = "No reminders were processed."
 
+
+    print(f"Text being sent to Slack: {text}")
+    send_message_to_slack(user_id, channel_name, channel_id, text)
     return Response(), 200
 
 
